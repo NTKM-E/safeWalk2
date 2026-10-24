@@ -44,3 +44,17 @@ button {
   padding: 6px 10px;
   cursor: pointer;
 }
+
+/* Report-an-issue section */
+[hidden] { display: none !important; } /* keep the hidden attribute working despite display rules below */
+#report { margin-top: 12px; padding-top: 10px; border-top: 1px solid #ddd; font-size: 14px; }
+#report h2 { margin: 0 0 6px; font-size: 15px; }
+#report input[type="file"] { width: 100%; }
+#preview { display: block; width: 100%; max-height: 140px; object-fit: cover; margin-top: 8px; border-radius: 6px; }
+#report-status { margin: 6px 0; color: #444; }
+#report-form label { display: flex; justify-content: space-between; align-items: center; margin: 4px 0; }
+#report-form select { max-width: 150px; }
+
+/* Map pins for reports, and their popups */
+.report-pin { font-size: 22px; line-height: 1; text-shadow: 0 0 3px white; }
+.report-popup img { width: 180px; border-radius: 4px; display: block; margin-bottom: 4px; }

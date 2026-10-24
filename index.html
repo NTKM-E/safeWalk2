@@ -17,12 +17,26 @@
     <p id="status">Click the map to set your start point (A).</p>
     <div id="routes"></div>
     <button id="reset">Reset</button>
+
+    <!-- Report an issue: photo -> AI category -> place on map -->
+    <div id="report">
+      <h2>Report an issue</h2>
+      <input type="file" id="photo" accept="image/*" />
+      <img id="preview" hidden alt="Selected photo" />
+      <p id="report-status"></p>
+      <div id="report-form" hidden>
+        <label>Category <select id="report-category"></select></label>
+        <label>Severity <select id="report-severity"></select></label>
+        <button id="place-report">Place on map</button>
+      </div>
+    </div>
   </div>
 
   <div id="map"></div>
 
-  <!-- config.js must load BEFORE app.js, because app.js uses CONFIG -->
+  <!-- config.js and vision.js must load BEFORE app.js, because app.js uses them -->
   <script src="config.js"></script>
+  <script src="vision.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

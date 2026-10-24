@@ -26,6 +26,11 @@ const routesEl = document.getElementById("routes");
 
 // ---------- 4. Handle map clicks ----------
 map.on("click", (e) => {
+  // If the user is placing a report, this click is its location, not a route point.
+  if (placingReport) {
+    placeReport(e.latlng);
+    return;
+  }
   if (!pointA) {
     pointA = e.latlng;
     markers.push(L.marker(pointA).addTo(map).bindTooltip("A", { permanent: true }));
@@ -113,7 +118,128 @@ function drawRoutes(trips) {
   statusEl.textContent = `Found ${trips.length} route(s). Press Reset to try again.`;
 }
 
-// ---------- 7. Decode Valhalla's compressed path ----------
+// ---------- 7. Report an issue with a photo ----------
+// Flow: choose photo -> Gemini suggests category + severity (see vision.js)
+// -> user can correct it -> user clicks the map to place the report.
+// Reports are saved in this browser (localStorage) so they survive a reload.
+const REPORTS_KEY = "safewalk-reports";
+let reports = [];          // [{id, lat, lng, category, severity, confidence, description, thumb, createdAt}]
+let pendingReport = null;  // a classified report waiting for its map location
+let placingReport = false; // true after "Place on map": the next map click sets its location
+
+const photoInput = document.getElementById("photo");
+const previewEl = document.getElementById("preview");
+const reportStatusEl = document.getElementById("report-status");
+const reportFormEl = document.getElementById("report-form");
+const categorySelect = document.getElementById("report-category");
+const severitySelect = document.getElementById("report-severity");
+
+// Fill the dropdowns from the lists in vision.js
+for (const [key, cat] of Object.entries(ISSUE_CATEGORIES)) {
+  categorySelect.add(new Option(`${cat.icon} ${cat.label}`, key));
+}
+SEVERITY_LEVELS.forEach((level) => severitySelect.add(new Option(level, level)));
+
+photoInput.addEventListener("change", async () => {
+  const file = photoInput.files[0];
+  if (!file) return;
+  pendingReport = null;
+  placingReport = false;
+  reportFormEl.hidden = true;
+  reportStatusEl.textContent = "Analyzing photo...";
+
+  try {
+    const dataUrl = await resizeImage(file);
+    previewEl.src = dataUrl;
+    previewEl.hidden = false;
+
+    const result = await classifyImage(dataUrl);
+    const cat = ISSUE_CATEGORIES[result.category];
+    reportStatusEl.textContent =
+      `AI suggestion: ${cat.icon} ${cat.label} (${result.severity}, ` +
+      `${Math.round(result.confidence * 100)}% confident). ${result.description}`;
+
+    categorySelect.value = result.category;
+    severitySelect.value = result.severity;
+    // Keep a small copy of the photo for the map popup (the full one is too big to save).
+    pendingReport = { ...result, thumb: await resizeImage(file, 240, 0.7) };
+    reportFormEl.hidden = false;
+  } catch (err) {
+    console.error(err);
+    reportStatusEl.textContent = "Couldn't analyze photo: " + err.message;
+  }
+});
+
+document.getElementById("place-report").addEventListener("click", () => {
+  placingReport = true;
+  reportStatusEl.textContent = "Click the map where the issue is.";
+});
+
+function placeReport(latlng) {
+  const report = {
+    ...pendingReport,
+    // The user's choice wins over the AI suggestion
+    category: categorySelect.value,
+    severity: severitySelect.value,
+    id: Date.now(),
+    lat: latlng.lat,
+    lng: latlng.lng,
+    createdAt: new Date().toISOString(),
+  };
+  reports.push(report);
+  saveReports();
+  drawReport(report);
+
+  pendingReport = null;
+  placingReport = false;
+  reportFormEl.hidden = true;
+  previewEl.hidden = true;
+  photoInput.value = "";
+  reportStatusEl.textContent = "Report added. Thanks!";
+}
+
+function drawReport(report) {
+  const cat = ISSUE_CATEGORIES[report.category] || ISSUE_CATEGORIES.none;
+  const icon = L.divIcon({ className: "report-pin", html: cat.icon, iconSize: [24, 24] });
+
+  // Build the popup with textContent, not innerHTML, because the description
+  // comes from the AI model and should never be treated as HTML.
+  const popup = document.createElement("div");
+  popup.className = "report-popup";
+  if (report.thumb) {
+    const img = document.createElement("img");
+    img.src = report.thumb;
+    popup.appendChild(img);
+  }
+  const title = document.createElement("strong");
+  title.textContent = `${cat.label} (${report.severity})`;
+  const desc = document.createElement("div");
+  desc.textContent = report.description;
+  popup.append(title, desc);
+
+  L.marker([report.lat, report.lng], { icon }).addTo(map).bindPopup(popup);
+}
+
+function saveReports() {
+  try {
+    localStorage.setItem(REPORTS_KEY, JSON.stringify(reports));
+  } catch (err) {
+    console.warn("Couldn't save reports (storage full or blocked):", err);
+  }
+}
+
+function loadReports() {
+  try {
+    reports = JSON.parse(localStorage.getItem(REPORTS_KEY)) || [];
+  } catch {
+    reports = [];
+  }
+  reports.forEach(drawReport);
+}
+
+loadReports();
+
+// ---------- 8. Decode Valhalla's compressed path ----------
 // Valhalla uses the "encoded polyline" format with 6 decimals of precision.
 // Each number is stored as the *difference* from the previous one, packed into
 // ASCII characters, to keep the response small.
