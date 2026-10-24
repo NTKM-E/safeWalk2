@@ -1,0 +1,17 @@
+# Local Postgres + PostGIS for development. In production, use Supabase instead.
+#   docker compose up -d
+# db/schema.sql runs automatically the first time the volume is created.
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: safewalk
+      POSTGRES_PASSWORD: safewalk
+      POSTGRES_DB: safewalk
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/10-schema.sql:ro
+volumes:
+  pgdata:

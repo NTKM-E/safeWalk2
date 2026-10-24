@@ -1,2 +1,15 @@
 # Private settings with the real API key
 config.js
+
+# Backend
+backend/.env
+backend/.venv/
+backend/uploads/
+__pycache__/
+.pytest_cache/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+*.tsbuildinfo
