@@ -9,6 +9,9 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
+  <!-- Supabase: the library that talks to our database and photo storage -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -17,12 +20,41 @@
     <p id="status">Click the map to set your start point (A).</p>
     <div id="routes"></div>
     <button id="reset">Reset</button>
+    <button id="report-btn">Report incident</button>
+    <div id="incident-count"></div>
   </div>
 
   <div id="map"></div>
 
+  <!-- The incident form. <dialog> is a built-in element that pops up above the page. -->
+  <dialog id="report-dialog">
+    <form id="report-form">
+      <h2>Report an incident</h2>
+
+      <label>Type
+        <select id="report-type" required></select>
+      </label>
+
+      <label>Photo
+        <input id="report-photo" type="file" accept="image/*" required />
+      </label>
+      <img id="photo-preview" alt="Photo preview" hidden />
+
+      <label>Notes (optional)
+        <textarea id="report-notes" rows="3" maxlength="500"></textarea>
+      </label>
+
+      <p id="report-error"></p>
+      <div class="form-buttons">
+        <button type="button" id="report-cancel">Cancel</button>
+        <button type="submit">Save incident</button>
+      </div>
+    </form>
+  </dialog>
+
   <!-- config.js must load BEFORE app.js, because app.js uses CONFIG -->
   <script src="config.js"></script>
   <script src="app.js"></script>
+  <script src="incidents.js"></script>
 </body>
 </html>

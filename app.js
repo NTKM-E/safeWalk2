@@ -25,7 +25,12 @@ const statusEl = document.getElementById("status");
 const routesEl = document.getElementById("routes");
 
 // ---------- 4. Handle map clicks ----------
+// appMode decides what a map click means: "route" (pick A/B) or "report" (place an incident).
+// incidents.js changes it when the user presses "Report incident".
+let appMode = "route";
+
 map.on("click", (e) => {
+  if (appMode !== "route") return; // incident mode: incidents.js handles this click
   if (!pointA) {
     pointA = e.latlng;
     markers.push(L.marker(pointA).addTo(map).bindTooltip("A", { permanent: true }));
