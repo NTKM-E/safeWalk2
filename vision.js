@@ -1,37 +1,30 @@
-// ---------- Computer vision: classify a photo of an infrastructure issue ----------
+// ---------- Computer vision: suggest an incident type from a photo ----------
 // We send the photo to Google's Gemini model and ask it to answer with JSON
-// that matches a fixed list of categories. The key and model name come from
+// that picks one of our incident types. The key and model name come from
 // config.js (CONFIG.GEMINI_KEY, CONFIG.GEMINI_MODEL).
+// The type keys must match INCIDENT_TYPES in incidents.js (and the database).
 
-// The issue types we support. "severity" is a starting weight a route scorer
-// can use later; "night" marks issues that matter more after dark.
-const ISSUE_CATEGORIES = {
-  pothole:          { label: "Pothole / damaged pavement",  icon: "🕳️", severity: 3, night: false },
-  unpaved_road:     { label: "Unpaved or dirt path",        icon: "🟫", severity: 2, night: false },
-  broken_signal:    { label: "Broken traffic / crosswalk light", icon: "🚦", severity: 3, night: false },
-  lighting:         { label: "Broken streetlight / poor lighting", icon: "💡", severity: 2, night: true },
-  construction:     { label: "Construction",                 icon: "🚧", severity: 2, night: false },
-  obstruction:      { label: "Trash / obstruction",          icon: "🗑️", severity: 2, night: false },
-  none:             { label: "No issue detected",            icon: "✅", severity: 0, night: false },
+// What each type looks like, in words the model can match against the photo.
+// "none" is only for the AI: it means "this photo shows no problem".
+const AI_TYPE_HINTS = {
+  pothole:                 "potholes, cracked, broken or uneven pavement or sidewalk, trip hazards",
+  unpaved_surface:         "dirt, gravel or unpaved road or path where pavement is expected",
+  pedestrian_signal_issue: "broken, dark or damaged traffic light or pedestrian crossing signal",
+  lighting:                "broken or unlit streetlight, or a walkway that is clearly too dark",
+  construction:            "construction work, cones, barriers, scaffolding, closed sidewalk",
+  trash:                   "litter, trash bags, dumped items or debris on the path",
+  obstruction:             "vehicles, fallen trees or large objects blocking the path",
+  other:                   "a pedestrian infrastructure problem that fits none of the above",
+  none:                    "no infrastructure problem is visible, or the photo is unrelated",
 };
-
-const SEVERITY_LEVELS = ["low", "medium", "high"];
 
 const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models";
 
 // Instructions for the model. We keep it to things a camera can actually see.
 const VISION_PROMPT = `You review photos submitted to a pedestrian safety app.
 Classify the main pedestrian or road infrastructure problem visible in the photo.
-Categories:
-- pothole: potholes, cracked, broken or uneven pavement or sidewalk, trip hazards
-- unpaved_road: dirt, gravel or unpaved road or path where pavement is expected
-- broken_signal: broken, dark or damaged traffic light or pedestrian crossing signal
-- lighting: broken or unlit streetlight, or a walkway that is clearly too dark
-- construction: construction work, cones, barriers, scaffolding, closed sidewalk
-- obstruction: trash, debris, dumped items, vehicles or objects blocking the path
-- none: no infrastructure problem is visible, or the photo is unrelated
-Severity: "high" if it could injure someone or forces pedestrians into the road,
-"medium" if it makes walking noticeably harder, "low" if it is minor.
+Types:
+${Object.entries(AI_TYPE_HINTS).map(([key, hint]) => `- ${key}: ${hint}`).join("\n")}
 Only describe what is visible. Do not guess about people, crime, or intent.
 Give a conservative confidence from 0 to 1 and a one-sentence description.`;
 
@@ -39,23 +32,23 @@ Give a conservative confidence from 0 to 1 and a one-sentence description.`;
 const VISION_SCHEMA = {
   type: "OBJECT",
   properties: {
-    category:    { type: "STRING", enum: Object.keys(ISSUE_CATEGORIES) },
-    severity:    { type: "STRING", enum: SEVERITY_LEVELS },
+    type:        { type: "STRING", enum: Object.keys(AI_TYPE_HINTS) },
     confidence:  { type: "NUMBER" },
     description: { type: "STRING" },
   },
-  required: ["category", "severity", "confidence", "description"],
+  required: ["type", "confidence", "description"],
 };
 
-// Send a resized JPEG (as a data URL) to Gemini and return
-// { category, severity, confidence, description }.
-async function classifyImage(dataUrl) {
-  if (!CONFIG.GEMINI_KEY) {
-    throw new Error("Add GEMINI_KEY to config.js (get a free key at aistudio.google.com).");
-  }
+// Is the AI set up? If not, the user just picks the type themselves.
+function visionEnabled() {
+  return Boolean(CONFIG.GEMINI_KEY);
+}
+
+// Send a photo (a Blob, already shrunk) to Gemini and return
+// { type, confidence, description }. `type` is one of AI_TYPE_HINTS' keys.
+async function classifyImage(blob) {
+  if (!visionEnabled()) throw new Error("Add GEMINI_KEY to config.js to enable AI suggestions.");
   const model = CONFIG.GEMINI_MODEL || "gemini-3.5-flash-lite";
-  const [header, base64] = dataUrl.split(",");
-  const mimeType = header.match(/data:(.*);base64/)[1];
 
   const res = await fetch(`${GEMINI_URL}/${model}:generateContent`, {
     method: "POST",
@@ -64,7 +57,7 @@ async function classifyImage(dataUrl) {
       contents: [{
         parts: [
           { text: VISION_PROMPT },
-          { inline_data: { mime_type: mimeType, data: base64 } },
+          { inline_data: { mime_type: blob.type || "image/jpeg", data: await blobToBase64(blob) } },
         ],
       }],
       generationConfig: {
@@ -88,32 +81,18 @@ async function classifyImage(dataUrl) {
 
   // Never trust the reply blindly: clamp it back into our allowed values.
   return {
-    category: ISSUE_CATEGORIES[result.category] ? result.category : "none",
-    severity: SEVERITY_LEVELS.includes(result.severity) ? result.severity : "medium",
+    type: AI_TYPE_HINTS[result.type] ? result.type : "other",
     confidence: Math.max(0, Math.min(1, Number(result.confidence) || 0)),
     description: String(result.description || "").slice(0, 300),
   };
 }
 
-// Shrink a photo before uploading. Phone photos are often 5+ MB; the model
-// does not need that much detail, and smaller uploads are faster.
-function resizeImage(file, maxSize = 1024, quality = 0.85) {
+// Gemini wants the image as plain base64 text (without the "data:...;base64," prefix).
+function blobToBase64(blob) {
   return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => {
-      const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
-      const canvas = document.createElement("canvas");
-      canvas.width = Math.round(img.width * scale);
-      canvas.height = Math.round(img.height * scale);
-      canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
-      URL.revokeObjectURL(url);
-      resolve(canvas.toDataURL("image/jpeg", quality));
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error("That file could not be read as an image."));
-    };
-    img.src = url;
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(",")[1]);
+    reader.onerror = () => reject(new Error("Could not read the photo."));
+    reader.readAsDataURL(blob);
   });
 }

@@ -1,3 +1,6 @@
+/* Keep the hidden attribute working even on elements with a display rule */
+[hidden] { display: none !important; }
+
 html, body {
   margin: 0;
   height: 100%;
@@ -95,7 +98,9 @@ button {
   margin-top: 4px;
   box-sizing: border-box;
 }
-#photo-preview {
+#photo-preview,
+#camera-video {
+  display: block;
   width: 100%;
   max-height: 160px;
   object-fit: cover;
@@ -104,16 +109,47 @@ button {
 #report-error { margin: 4px 0; color: #dc2626; font-size: 13px; }
 .form-buttons { display: flex; justify-content: flex-end; gap: 8px; }
 
-/* Report-an-issue section */
-[hidden] { display: none !important; } /* keep the hidden attribute working despite display rules below */
-#report { margin-top: 12px; padding-top: 10px; border-top: 1px solid #ddd; font-size: 14px; }
-#report h2 { margin: 0 0 6px; font-size: 15px; }
-#report input[type="file"] { width: 100%; }
-#preview { display: block; width: 100%; max-height: 140px; object-fit: cover; margin-top: 8px; border-radius: 6px; }
-#report-status { margin: 6px 0; color: #444; }
-#report-form label { display: flex; justify-content: space-between; align-items: center; margin: 4px 0; }
-#report-form select { max-width: 150px; }
+/* Camera inside the report form */
+#camera-video { background: #111; }
+#camera { margin: 8px 0; }
+#photo-source { justify-content: stretch; }
+#photo-source button { flex: 1; }
+#ai-suggestion,
+#report-location { margin: 6px 0; font-size: 13px; color: #444; }
 
-/* Map pins for reports, and their popups */
-.report-pin { font-size: 22px; line-height: 1; text-shadow: 0 0 3px white; }
-.report-popup img { width: 180px; border-radius: 4px; display: block; margin-bottom: 4px; }
+/* Unverified incidents get a dashed amber ring; verified ones a solid red ring */
+.incident-icon.unverified span { border: 2px dashed #d97706; }
+.incident-icon.verified span { border: 2px solid #dc2626; }
+
+.incident-popup .badge {
+  display: inline-block;
+  margin: 4px 0;
+  padding: 1px 6px;
+  font-size: 12px;
+  border-radius: 4px;
+  background: #fef3c7;
+  color: #92400e;
+}
+.incident-popup .badge.verified { background: #fee2e2; color: #991b1b; }
+
+/* The user's own position */
+.user-dot {
+  width: 14px;
+  height: 14px;
+  background: #2563eb;
+  border: 3px solid white;
+  border-radius: 50%;
+  box-shadow: 0 0 6px rgba(37, 99, 235, 0.8);
+}
+
+/* "Is this still here?" popup */
+#verify-dialog {
+  width: min(340px, 90vw);
+  border: none;
+  border-radius: 10px;
+  padding: 16px;
+}
+#verify-dialog::backdrop { background: rgba(0, 0, 0, 0.4); }
+#verify-dialog h2 { margin: 0 0 8px; font-size: 18px; }
+#verify-photo { display: block; width: 100%; max-height: 180px; object-fit: cover; border-radius: 6px; }
+#verify-text { font-size: 14px; }

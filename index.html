@@ -22,19 +22,6 @@
     <button id="reset">Reset</button>
     <button id="report-btn">Report incident</button>
     <div id="incident-count"></div>
-
-    <!-- Report an issue: photo -> AI category -> place on map -->
-    <div id="report">
-      <h2>Report an issue</h2>
-      <input type="file" id="photo" accept="image/*" />
-      <img id="preview" hidden alt="Selected photo" />
-      <p id="report-status"></p>
-      <div id="report-form" hidden>
-        <label>Category <select id="report-category"></select></label>
-        <label>Severity <select id="report-severity"></select></label>
-        <button id="place-report">Place on map</button>
-      </div>
-    </div>
   </div>
 
   <div id="map"></div>
@@ -44,28 +31,51 @@
     <form id="report-form">
       <h2>Report an incident</h2>
 
+      <!-- Step 1: a live photo from the camera (location is automatic),
+           or an uploaded photo (the user marks the location on the map). -->
+      <div id="photo-source" class="form-buttons">
+        <button type="button" id="take-photo">📷 Take photo</button>
+        <button type="button" id="upload-photo">🖼️ Upload photo</button>
+      </div>
+      <input id="report-photo" type="file" accept="image/*" hidden />
+      <div id="camera" hidden>
+        <video id="camera-video" autoplay playsinline muted></video>
+        <button type="button" id="snap">Snap photo</button>
+      </div>
+      <img id="photo-preview" alt="Photo preview" hidden />
+      <p id="ai-suggestion"></p>
+
+      <!-- Step 2: check the type (pre-filled by the AI) and add notes -->
       <label>Type
         <select id="report-type" required></select>
       </label>
-
-      <label>Photo
-        <input id="report-photo" type="file" accept="image/*" required />
-      </label>
-      <img id="photo-preview" alt="Photo preview" hidden />
 
       <label>Notes (optional)
         <textarea id="report-notes" rows="3" maxlength="500"></textarea>
       </label>
 
+      <p id="report-location"></p>
       <p id="report-error"></p>
       <div class="form-buttons">
         <button type="button" id="report-cancel">Cancel</button>
-        <button type="submit">Save incident</button>
+        <button type="submit" id="report-save" disabled>Save incident</button>
       </div>
     </form>
   </dialog>
 
-  <!-- config.js must load BEFORE app.js, because app.js uses CONFIG -->
+  <!-- Shown to other users when they walk near an incident -->
+  <dialog id="verify-dialog">
+    <h2>Is this hazard still here?</h2>
+    <img id="verify-photo" alt="Reported hazard" />
+    <p id="verify-text"></p>
+    <div class="form-buttons">
+      <button type="button" id="verify-unsure">Not sure</button>
+      <button type="button" id="verify-no">No, it's gone</button>
+      <button type="button" id="verify-yes">Yes, it's here</button>
+    </div>
+  </dialog>
+
+  <!-- Order matters: config.js (CONFIG) and vision.js are used by the scripts after them -->
   <script src="config.js"></script>
   <script src="vision.js"></script>
   <script src="app.js"></script>
