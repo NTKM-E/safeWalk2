@@ -13,7 +13,6 @@ frontend/   React + TypeScript + Vite + Mapbox GL JS
 backend/    Python FastAPI: route scoring, reports, Gemini photo classification
   ingest/   nightly job: pull police calls → geocode → Postgres
 db/         Postgres + PostGIS schema (Supabase in production)
-oldStuff/   previous prototype, kept for reference
 ```
 
 ## How it works
