@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../safewalk-dynamic-routing"
+		},
+		{
+			"path": "../safeWalk2-reporting"
+		}
+	],
+	"settings": {}
+}
